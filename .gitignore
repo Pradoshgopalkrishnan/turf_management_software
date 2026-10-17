@@ -9,3 +9,12 @@ bin/
 .settings/
 .classpath
 .project
+
+# Personal VS Code run settings
+.vscode/launch.json
+
+# OS junk
+Thumbs.db
+.DS_Store
+summary.md
+README.md
