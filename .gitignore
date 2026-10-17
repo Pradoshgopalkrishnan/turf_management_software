@@ -14,10 +14,9 @@ bin/
 .vscode/launch.json
 
 # Local notes, agent checkpoints, and architecture docs
-summary.md
+
 explanation.md
-architecture.md
-checkpoint.md
+
 
 # OS junk
 Thumbs.db
