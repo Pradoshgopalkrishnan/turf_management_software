@@ -25,3 +25,79 @@ including affected files and how the result was validated.
   database connection work. The Java debugger also started the test class.
   The saved launch configuration itself was not separately exercised through
   the editor's Run button.
+
+### `ModelTest.java` launch fails
+
+- **Issue:** The `Run ModelTest` launch configuration targets `model.ModelTest`,
+  and `src/model/ModelTest.java` does define that class and a `main` method.
+- **Diagnosis:** The actual compile blocker is `src/model/Promocode.java`:
+  it declares `public class PromoCode`, and Java requires a public class's
+  filename to match exactly. The required name is `PromoCode.java`, not
+  `Promocode.java`.
+- **Validation:** Compiling every Java file in `src/model` with `javac`
+  failed with `class PromoCode is public, should be declared in a file named
+  PromoCode.java`. The launch configuration's `mainClass` is correct. No
+  Java source files were changed during diagnosis.
+- **Correction to earlier diagnosis:** The previous report that
+  `ModelTest.java` declared `Booking` and lacked `main` was incorrect; the
+  file's actual contents define a runnable `ModelTest`. The earlier debugger
+  response saying it started the class did not validate a full successful
+  project compilation.
+
+### Clarifying the Java "non-project file" message
+
+- **Meaning:** VS Code's Java language server is not associating
+  `Booking.java` with an imported Java project. It therefore limits reporting
+  for that file to syntax errors and may not provide project-aware type,
+  dependency, or build diagnostics for it.
+- **Correction:** This status does not establish that `Booking.java` is
+  compiled as part of the project, so it must not be used alone to claim a
+  duplicate-class build failure.
+
+### `model.ModelTest` still reports `ClassNotFoundException`
+
+- **Issue:** The manual Java command uses the Java Language Server output
+  directory as its classpath, but reports `Could not find or load main class
+  model.ModelTest`.
+- **Diagnosis:** At inspection time, that output directory did not contain a
+  `model` class output directory. The Java source files now have matching
+  public class names, and `ModelTest.java` defines `main`; the earlier
+  `Promocode.java`/`PromoCode` filename mismatch has been corrected in the
+  workspace. A fresh compilation succeeds, so the remaining error in the
+  pasted command is stale/missing compiled output in the Java Language Server
+  workspace classpath, not a missing `main` method.
+- **Validation:** Compiled all files in `src/model` to a temporary output
+  directory and ran `model.ModelTest` successfully, including its polymorphism,
+  pricing, and promo checks. The Java debugger also accepted a launch of
+  `model.ModelTest` after the source filename was corrected.
+- **Next action:** In VS Code run **Java: Clean Java Language Server
+  Workspace** from the Command Palette and allow the Java project to reload,
+  then use the Java **Run** action. Avoid manually launching against the
+  `jdt_ws` output directory until it has regenerated the class files.
+
+### Java project now runs successfully
+
+### Added architecture diagram
+
+- **Change:** Created `architecture.md` containing a Mermaid flowchart that visualises the workspace layout.
+- **Files involved:** `architecture.md`.
+- **Validation:** The file was created successfully and contains a valid Mermaid diagram that can be rendered by VS Code or any Mermaid viewer.
+
+
+- **Status:** The Java debugging and database connectivity issues are resolved.
+- **What fixed it:** The real blockers were (1) the public class/file naming
+  mismatch (`Promocode.java` versus `PromoCode`), and (2) missing MySQL JDBC
+  access on the classpath for the database test program. Once the class name
+  matched the file name and the JDBC JAR was included in the runtime classpath,
+  the project compiled and ran correctly.
+- **Files involved:** `src/model/PromoCode.java`, `src/model/ModelTest.java`,
+  `src/db/Testconnection.java`, and the Java launch setup under `.vscode/`.
+- **Validation:** Confirmed with a full compile and runtime check:
+  - `javac -d bin -cp "lib/mysql-connector-j-26.7.0.jar" $(find src -name '*.java')`
+    completed successfully.
+  - `java -cp "bin;lib/mysql-connector-j-26.7.0.jar" model.ModelTest`
+    printed the expected polymorphism, pricing, and promo output.
+  - `java -cp "bin;lib/mysql-connector-j-26.7.0.jar" db.Testconnection`
+    connected successfully and printed the seeded turf records.
+- **Result:** Both the Java model test and the MySQL connection test now work
+  end-to-end in the project environment.

@@ -5,7 +5,7 @@ db.properties
 bin/
 *.class
 
-# VS Code Java language server leftovers
+# VS Code & Eclipse Java language server leftovers
 .settings/
 .classpath
 .project
@@ -13,7 +13,12 @@ bin/
 # Personal VS Code run settings
 .vscode/launch.json
 
+# Local notes, agent checkpoints, and architecture docs
+summary.md
+explanation.md
+architecture.md
+checkpoint.md
+
 # OS junk
 Thumbs.db
 .DS_Store
-summary.md

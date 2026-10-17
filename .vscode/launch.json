@@ -5,11 +5,13 @@
             "type": "java",
             "name": "Run Testconnection",
             "request": "launch",
-            "mainClass": "db.Testconnection",
-            "classPaths": [
-                "$Auto",
-                "${workspaceFolder}/lib/mysql-connector-j-26.7.0.jar"
-            ]
+            "mainClass": "db.Testconnection"
+        },
+        {
+            "type": "java",
+            "name": "Run ModelTest",
+            "request": "launch",
+            "mainClass": "model.ModelTest"
         }
     ]
 }
