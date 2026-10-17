@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Run Testconnection",
+            "request": "launch",
+            "mainClass": "db.Testconnection",
+            "classPaths": [
+                "$Auto",
+                "${workspaceFolder}/lib/mysql-connector-j-26.7.0.jar"
+            ]
+        }
+    ]
+}

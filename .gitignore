@@ -1,0 +1,11 @@
+# Real DB credentials: never commit
+db.properties
+
+# Compiled output
+bin/
+*.class
+
+# VS Code Java language server leftovers
+.settings/
+.classpath
+.project
