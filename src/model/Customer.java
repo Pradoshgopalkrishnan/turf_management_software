@@ -17,7 +17,6 @@ public class Customer extends User {
 
     @Override
     public void openDashboard() {
-        // Phase 5 will replace this line with: new CustomerDashboard(this).setVisible(true);
-        System.out.println("Opening CUSTOMER dashboard for " + getName());
+        new ui.CustomerDashboard(this).setVisible(true);
     }
 }

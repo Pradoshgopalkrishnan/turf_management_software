@@ -149,3 +149,26 @@ including affected files and how the result was validated.
   name is `classPaths`. The old lines were ignored.
 - **Change:** Replaced with `"classPaths": ["$Auto", "${workspaceFolder}/lib/mysql-connector-j-26.7.0.jar"]`
   (`$Auto` keeps the project's own output and libraries on the path).
+
+## 2026-10-20 (Phase 5)
+
+### Customer Dashboard and View Turfs
+
+- **Change:** `DatabaseManager.getAllTurfs()` returns every row of `turfs` as a
+  `List<Turf>` (ordered by name), using `PreparedStatement` and try-with-resources.
+- **Change:** New `ui/CustomerDashboard` (`JFrame` with a `JTabbedPane`: Book a Slot |
+  My Bookings, a welcome label and a Logout button). Logout calls `customer.logout()`,
+  closes the window and shows `LoginFrame` again.
+- **Change:** New `ui/BookSlotPanel`: turf `JComboBox` loaded from `getAllTurfs()`, with
+  location, capacity and base price shown in labels. Selecting a turf updates them.
+  `getSelectedTurf()` is there for Phase 6 onwards. If the DB call fails a dialog is
+  shown; if there are no turfs the combo is disabled and says "No turfs available".
+- **Change:** New `ui/MyBookingsPanel`: placeholder until Phase 10.
+- **Change:** `Customer.openDashboard()` now opens `CustomerDashboard`.
+  `Admin.openDashboard()` opens `PlaceholderDashboard` until Phase 11.
+- **Change:** `LoginFrame` no longer opens `PlaceholderDashboard` itself; it only calls
+  `user.openDashboard()` (polymorphism). Before, a customer would have got two windows.
+- **Validation:** all files in `src/` compile with 0 errors. The windows were NOT run
+  (no display and no MySQL in the build environment).
+- **Note:** `model/ModelTest.java` calls `openDashboard()`, so running it now opens real
+  windows and needs the database. Remove that call from the test if you want it DB-free.

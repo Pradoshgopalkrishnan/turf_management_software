@@ -101,7 +101,6 @@ public class LoginFrame extends JFrame {
             // 4. correct details: open the right dashboard
             user.login();
             user.openDashboard();   // POLYMORPHISM: Customer and Admin each do their own thing
-            new PlaceholderDashboard(user).setVisible(true);
             dispose();              // close the login window
 
         } catch (SQLException ex) {
