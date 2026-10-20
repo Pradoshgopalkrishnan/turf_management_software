@@ -102,4 +102,50 @@ including affected files and how the result was validated.
 - **Result:** Both the Java model test and the MySQL connection test now work
   end-to-end in the project environment.
 
-  **PHASE 4** NEXT IMPLEMENTS LOGIN FEATURES
+ 
+
+## 2026-10-19
+
+### Added MySQL connector JAR to launch.json classpath
+
+- **Issue:** The `Run Testconnection` launch configuration in `.vscode/launch.json` had no `classpath` entry, so the MySQL Connector/J JAR was not on the runtime classpath when debugging.
+- **Change:** Added `"classpath": ["${workspaceFolder}/lib/mysql-connector-j-26.7.0.jar", "${workspaceFolder}/bin"]` to the `Run Testconnection` configuration.
+- **Files involved:** `.vscode/launch.json`.
+- **Validation:** The launch configuration now includes the JDBC driver JAR and the compiled classes directory, so `db.Testconnection` will find the driver at runtime.
+
+### Fixed README case inconsistency for Testconnection
+
+- **Issue:** README.md referenced `TestConnection.java` (capital C) in three places, but the actual file is `Testconnection.java` (lowercase c).
+- **Change:** Updated all three references in README.md:
+  1. Project structure tree: `TestConnection.java` → `Testconnection.java`
+  2. Step 6 instruction: `TestConnection.java` → `Testconnection.java`
+  3. Terminal command: `db.TestConnection` → `db.Testconnection`
+- **Files involved:** `README.md`.
+- **Validation:** README now matches the actual filename on disk.
+ **PHASE 4** NEXT IMPLEMENTS LOGIN FEATURES
+## 2026-10-20
+
+### Build fails: `validateUser`, `usernameExists`, `registerUser` not found
+
+- **Issue:** `LoginFrame` and `RegisterFrame` (Phase 4) call three methods that
+  did not exist in `DatabaseManager`, which still only had `connect()`.
+- **Change:** Added `validateUser(String, String)` (returns `Customer`, `Admin`
+  or `null`), `usernameExists(String)` and `registerUser(String, String, String,
+  String)` to `src/db/DatabaseManager.java`, all with `PreparedStatement` and
+  try-with-resources.
+- **Change:** Moved `Main.java` from the project root into `src/`. The VS Code
+  setting `java.project.sourcePaths` is `["src"]`, so a root-level `Main.java`
+  was outside the project (the "non-project file" state), was never compiled
+  into `bin/`, and made `Run Main` fail with class-not-found.
+- **Validation:** `javac -Xlint:all -cp "lib/*"` over every file in `src/`
+  finishes with 0 errors in about 1.3 s. The SQL itself was not run against a
+  live MySQL; test with `admin/admin123`, `cust1/pass123`, a wrong password and
+  a new registration.
+
+### `launch.json`: "Property classpath is not allowed"
+
+- **Issue:** VS Code flagged `classpath` in `Run Main` and `Run Testconnection`.
+- **Diagnosis:** The Java launch schema has no `classpath` property; the correct
+  name is `classPaths`. The old lines were ignored.
+- **Change:** Replaced with `"classPaths": ["$Auto", "${workspaceFolder}/lib/mysql-connector-j-26.7.0.jar"]`
+  (`$Auto` keeps the project's own output and libraries on the path).

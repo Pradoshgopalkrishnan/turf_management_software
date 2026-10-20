@@ -3,9 +3,23 @@
     "configurations": [
         {
             "type": "java",
+            "name": "Run Main",
+            "request": "launch",
+            "mainClass": "Main",
+            "classPaths": [
+                "$Auto",
+                "${workspaceFolder}/lib/mysql-connector-j-26.7.0.jar"
+            ]
+        },
+        {
+            "type": "java",
             "name": "Run Testconnection",
             "request": "launch",
-            "mainClass": "db.Testconnection"
+            "mainClass": "db.Testconnection",
+            "classPaths": [
+                "$Auto",
+                "${workspaceFolder}/lib/mysql-connector-j-26.7.0.jar"
+            ]
         },
         {
             "type": "java",

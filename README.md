@@ -79,7 +79,7 @@ Example: base Rs. 1000, Saturday 7 PM (x1.3), code `WELCOME10` (10% off) gives 1
 ├── src/
 │   ├── db/
 │   │   ├── DatabaseManager.java   The only class that talks to MySQL
-│   │   └── TestConnection.java    Quick connection check
+│   │   └── Testconnection.java    Quick connection check
 │   ├── model/                     User, Customer, Admin, Turf, Booking, PromoCode
 │   └── ui/                        Swing windows (coming in later phases)
 ├── db.properties.example          Template for your local DB settings
@@ -130,7 +130,7 @@ Open the project folder in VS Code and wait for the Java extension to finish loa
 
 ### 6. Check the connection
 
-Open `src/db/TestConnection.java` and click **Run** above `main`. You should see:
+Open `src/db/Testconnection.java` and click **Run** above `main`. You should see:
 
 ```
 Connected!
@@ -142,7 +142,7 @@ Or, from the terminal in the project root (Windows PowerShell):
 
 ```powershell
 javac -cp "lib/*" -d bin src\db\*.java src\model\*.java
-java -cp "bin;lib/*" db.TestConnection
+java -cp "bin;lib/*" db.Testconnection
 ```
 
 ### Common errors

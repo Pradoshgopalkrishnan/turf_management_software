@@ -1,0 +1,31 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Run Main",
+            "request": "launch",
+            "mainClass": "Main",
+            "classpath": [
+                "${workspaceFolder}/lib/mysql-connector-j-26.7.0.jar",
+                "${workspaceFolder}/bin"
+            ]
+        },
+        {
+            "type": "java",
+            "name": "Run Testconnection",
+            "request": "launch",
+            "mainClass": "db.Testconnection",
+            "classpath": [
+                "${workspaceFolder}/lib/mysql-connector-j-26.7.0.jar",
+                "${workspaceFolder}/bin"
+            ]
+        },
+        {
+            "type": "java",
+            "name": "Run ModelTest",
+            "request": "launch",
+            "mainClass": "model.ModelTest"
+        }
+    ]
+}

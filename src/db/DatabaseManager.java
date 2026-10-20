@@ -4,8 +4,14 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Properties;
+
+import model.Admin;
+import model.Customer;
+import model.User;
 
 /**
  * DatabaseManager: the ONLY class that talks to MySQL.
@@ -46,5 +52,77 @@ public class DatabaseManager {
      */
     public Connection connect() throws SQLException {
         return DriverManager.getConnection(url, user, password);
+    }
+
+    // =====================================================================
+    // Phase 4: Login and Register
+    // =====================================================================
+
+    /**
+     * Looks for a user with this username AND password.
+     * Returns a Customer or an Admin (depending on the 'role' column),
+     * or null if no row matches.
+     */
+    public User validateUser(String username, String password) throws SQLException {
+        String sql = "SELECT user_id, name, contact, username, password, role "
+                   + "FROM users WHERE username = ? AND password = ?";
+
+        try (Connection con = connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setString(1, username);
+            ps.setString(2, password);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    return null;   // wrong username or password
+                }
+
+                int id        = rs.getInt("user_id");
+                String name   = rs.getString("name");
+                String contact = rs.getString("contact");
+                String uname  = rs.getString("username");
+                String pass   = rs.getString("password");
+                String role   = rs.getString("role");
+
+                if ("ADMIN".equals(role)) {
+                    return new Admin(id, name, contact, uname, pass);
+                }
+                return new Customer(id, name, contact, uname, pass);
+            }
+        }
+    }
+
+    /** Returns true if this username is already taken. */
+    public boolean usernameExists(String username) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM users WHERE username = ?";
+
+        try (Connection con = connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setString(1, username);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return rs.getInt(1) > 0;
+            }
+        }
+    }
+
+    /** Inserts a new CUSTOMER account. (Admins are added directly in the database.) */
+    public void registerUser(String name, String contact, String username, String password)
+            throws SQLException {
+        String sql = "INSERT INTO users (name, contact, username, password, role) "
+                   + "VALUES (?, ?, ?, ?, 'CUSTOMER')";
+
+        try (Connection con = connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setString(1, name);
+            ps.setString(2, contact);
+            ps.setString(3, username);
+            ps.setString(4, password);
+            ps.executeUpdate();
+        }
     }
 }
