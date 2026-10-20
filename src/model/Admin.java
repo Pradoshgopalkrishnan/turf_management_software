@@ -17,7 +17,7 @@ public class Admin extends User {
 
     @Override
     public void openDashboard() {
-        // Phase 11 will replace this line with: new AdminDashboard(this).setVisible(true);
-        System.out.println("Opening ADMIN dashboard for " + getName());
+        // Phase 11 will replace this line with: new ui.AdminDashboard(this).setVisible(true);
+        new ui.PlaceholderDashboard(this).setVisible(true);
     }
 }

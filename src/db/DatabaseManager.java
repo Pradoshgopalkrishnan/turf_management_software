@@ -7,10 +7,13 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
 import model.Admin;
 import model.Customer;
+import model.Turf;
 import model.User;
 
 /**
@@ -124,5 +127,32 @@ public class DatabaseManager {
             ps.setString(4, password);
             ps.executeUpdate();
         }
+    }
+
+    // =====================================================================
+    // Phase 5: Turfs
+    // =====================================================================
+
+    /** Returns every turf in the database, ordered by name. */
+    public List<Turf> getAllTurfs() throws SQLException {
+        String sql = "SELECT turf_id, name, location, capacity, base_price "
+                   + "FROM turfs ORDER BY name";
+
+        List<Turf> turfs = new ArrayList<>();
+
+        try (Connection con = connect();
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+
+            while (rs.next()) {
+                turfs.add(new Turf(
+                        rs.getInt("turf_id"),
+                        rs.getString("name"),
+                        rs.getString("location"),
+                        rs.getInt("capacity"),
+                        rs.getDouble("base_price")));
+            }
+        }
+        return turfs;
     }
 }
