@@ -10,8 +10,7 @@ bin/
 .classpath
 .project
 
-# Personal VS Code run settings
-.vscode/launch.json
+
 
 # Local notes, agent checkpoints, and architecture docs
 
