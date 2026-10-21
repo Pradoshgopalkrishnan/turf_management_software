@@ -220,3 +220,35 @@ including affected files and how the result was validated.
   multipliers (base 1000: 1000, 1300, 1200, 1300; base 800: 800, 1040, 960, 1040), and the
   18:00 / 17:00 boundary behaves correctly. The window itself was NOT run (no display or
   MySQL in the build environment).
+
+## 2026-10-21 (Phase 8)
+
+### Promo Code Validation
+
+- **Change:** `DatabaseManager.validatePromoCode(String code)` runs
+  `SELECT ... FROM promo_codes WHERE code = ? AND is_active = TRUE` and returns a
+  `PromoCode` object, or `null` if no active code with that name exists. The expiry date
+  is checked separately with `promo.isValid()`. MySQL compares text case-insensitively,
+  so `welcome10` finds `WELCOME10`.
+- **Change:** the "Price" box in `BookSlotPanel` is now three rows: promo row (text field,
+  Apply button, message label), the Base / Surge / Total line, and a Discount / Final
+  total line. Pressing Enter in the field also applies the code.
+- **Change:** `applyPromo()`: blank field = no promo (removes any applied code, no error);
+  `null` or expired = red "Invalid or expired promo code" (and any earlier promo is
+  removed); valid = green "<CODE> applied: N% off", remembered in `appliedPromo`, price
+  recalculated. A promo stays applied when the slot, turf or date changes.
+- **Change:** `showPrice()` now builds a `Booking`, calls `setSurgeMultiplier(surge)` and
+  `calculateFinalTotal(discountPercent)`, so the discount maths lives in `Booking`
+  (one place, reused by Phase 9). With a promo the first line says "Subtotal" and the
+  second line shows the discount and final total.
+- **Change:** `percent()` helper prints 10.0 as "10" and 12.5 as "12.5". The dark green
+  colour is now one shared constant `GREEN` used by the promo message and `StatusRenderer`.
+- **Validation:** all of `src/` compiles with 0 errors. Tested in code with today's date
+  (2026-10-21): WELCOME10 valid; OLD20 invalid (expired); OFF50 invalid (inactive, and
+  the SQL never returns it); WELCOME10 on base 1000 gives 1300 -> 1170, 1000 -> 900,
+  1200 -> 1080; base 800 x1.30 gives 1040 -> 936. The window and the real MySQL lookups
+  were NOT run in the build environment.
+- **Note:** `WELCOME10` expires on 2026-12-31. If the demo is later than that, run
+  `UPDATE promo_codes SET expiry_date = '2027-12-31' WHERE code = 'WELCOME10';`.
+- **Next (Phase 9):** re-check the promo when Confirm is pressed (it could expire between
+  Apply and Confirm) and save `promo_code`, `discount_amount` and `final_total`.

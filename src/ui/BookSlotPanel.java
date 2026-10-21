@@ -3,6 +3,7 @@ package ui;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridLayout;
 import java.sql.SQLException;
@@ -13,6 +14,7 @@ import java.util.Locale;
 
 import javax.swing.BorderFactory;
 import javax.swing.DefaultListCellRenderer;
+import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JList;
@@ -20,6 +22,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -28,6 +31,7 @@ import javax.swing.table.DefaultTableModel;
 import db.DatabaseManager;
 import model.Booking;
 import model.Customer;
+import model.PromoCode;
 import model.Turf;
 
 /**
@@ -37,7 +41,8 @@ import model.Turf;
  * Phase 6 : pick a date (next 14 days) and see which hourly slots are
  *           Available or Booked for that turf and date.
  * Phase 7 : click a slot to see the price (base x surge = total).
- * Phase 8-9: promo code and Confirm button come after that.
+ * Phase 8 : type a promo code and press Apply to see the discounted price.
+ * Phase 9 : the Confirm button comes after that.
  */
 public class BookSlotPanel extends JPanel {
 
@@ -48,6 +53,8 @@ public class BookSlotPanel extends JPanel {
     private static final int FIRST_HOUR = 6;
     private static final int LAST_HOUR  = 23;
     private static final int DAYS_AHEAD = 14;
+
+    private static final Color GREEN = new Color(0, 128, 0);   // dark green, readable on white
 
     private static final String PRICE_PROMPT = "Select an available slot to see the price";
 
@@ -67,6 +74,10 @@ public class BookSlotPanel extends JPanel {
     private JTable slotTable;
 
     private JLabel priceInfo;      // Phase 7: "Base | Surge | Total" line
+    private JLabel discountInfo;   // Phase 8: "Discount | Final total" line
+    private JTextField promoField; // Phase 8: where the customer types the code
+    private JLabel promoMessage;   // Phase 8: "applied" / "Invalid or expired" text
+    private PromoCode appliedPromo; // null = no promo applied
 
     public BookSlotPanel(Customer customer) {
         this.customer = customer;
@@ -116,6 +127,7 @@ public class BookSlotPanel extends JPanel {
                 showPrice();
             }
         });
+        promoField.addActionListener(e -> applyPromo());   // pressing Enter in the field = Apply
 
         loadTurfs();
     }
@@ -165,12 +177,29 @@ public class BookSlotPanel extends JPanel {
 
     /** Builds the small "Price" box that sits under the slot table. */
     private JPanel buildPricePanel() {
+        // ---- row 1: promo code field + Apply button + message ----
+        promoField = new JTextField(12);
+        JButton applyButton = new JButton("Apply");
+        applyButton.addActionListener(e -> applyPromo());
+        promoMessage = new JLabel(" ");
+
+        JPanel promoRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        promoRow.add(new JLabel("Promo code:"));
+        promoRow.add(promoField);
+        promoRow.add(applyButton);
+        promoRow.add(promoMessage);
+
+        // ---- rows 2 and 3: the price lines ----
         priceInfo = new JLabel(PRICE_PROMPT);
         priceInfo.setFont(priceInfo.getFont().deriveFont(Font.BOLD, 14f));
+        discountInfo = new JLabel(" ");
+        discountInfo.setFont(discountInfo.getFont().deriveFont(Font.BOLD, 14f));
 
-        JPanel panel = new JPanel(new BorderLayout());
+        JPanel panel = new JPanel(new GridLayout(3, 1, 0, 4));
         panel.setBorder(BorderFactory.createTitledBorder("Price"));
-        panel.add(priceInfo, BorderLayout.CENTER);
+        panel.add(promoRow);
+        panel.add(priceInfo);
+        panel.add(discountInfo);
         return panel;
     }
 
@@ -242,9 +271,9 @@ public class BookSlotPanel extends JPanel {
     }
 
     /**
-     * Phase 7: works out and shows the price of the slot that is clicked in the table.
-     *   surge = Booking.determineSurge(...)   (weekend / evening, the higher one wins)
-     *   total = base price x surge
+     * Works out and shows the price of the slot that is clicked in the table.
+     *   Phase 7 : surge = Booking.determineSurge(...)   (weekend / evening, the higher one wins)
+     *   Phase 8 : final = base x surge - discount        (Booking.calculateFinalTotal)
      * The multipliers are read from MySQL on every click, so if the admin changes
      * them later the customer sees the new price straight away.
      */
@@ -262,6 +291,7 @@ public class BookSlotPanel extends JPanel {
 
         if ("Booked".equals(status)) {
             priceInfo.setText("This slot is already booked");
+            discountInfo.setText(" ");
             return;
         }
 
@@ -271,11 +301,30 @@ public class BookSlotPanel extends JPanel {
 
             double surge = Booking.determineSurge(date, slot, weekendMultiplier, eveningMultiplier);
             double base  = turf.getBasePrice();
-            double total = base * surge;
 
-            priceInfo.setText("Base: " + RUPEE + String.format("%.2f", base)
-                    + "   |   Surge: " + TIMES + String.format("%.2f", surge)
-                    + "   |   Total: " + RUPEE + String.format("%.2f", total));
+            // let the Booking object do the discount maths (no promo = 0 percent)
+            Booking booking = new Booking(customer.getUserId(), turf.getTurfId(), date, slot, base);
+            booking.setSurgeMultiplier(surge);
+            double discountPercent = (appliedPromo == null) ? 0 : appliedPromo.getDiscount();
+            booking.calculateFinalTotal(discountPercent);
+
+            double surged = base * surge;                 // price before any discount
+
+            if (appliedPromo == null) {
+                priceInfo.setText("Base: " + RUPEE + String.format("%.2f", base)
+                        + "   |   Surge: " + TIMES + String.format("%.2f", surge)
+                        + "   |   Total: " + RUPEE + String.format("%.2f", surged));
+                discountInfo.setText(" ");
+            } else {
+                priceInfo.setText("Base: " + RUPEE + String.format("%.2f", base)
+                        + "   |   Surge: " + TIMES + String.format("%.2f", surge)
+                        + "   |   Subtotal: " + RUPEE + String.format("%.2f", surged));
+                discountInfo.setText("Discount (" + appliedPromo.getCode() + ", "
+                        + percent(discountPercent) + "%): -" + RUPEE
+                        + String.format("%.2f", booking.getDiscountAmount())
+                        + "   |   Final total: " + RUPEE
+                        + String.format("%.2f", booking.getFinalTotal()));
+            }
         } catch (SQLException ex) {
             clearPrice();
             JOptionPane.showMessageDialog(this,
@@ -287,6 +336,53 @@ public class BookSlotPanel extends JPanel {
     /** Puts the price box back to its "nothing selected" message. */
     private void clearPrice() {
         priceInfo.setText(PRICE_PROMPT);
+        discountInfo.setText(" ");
+    }
+
+    /**
+     * Phase 8: called when the customer presses Apply (or Enter) in the promo field.
+     *   blank field          -> no promo, remove any applied code, no error
+     *   not found / inactive -> "Invalid or expired promo code"
+     *   found but expired    -> "Invalid or expired promo code"
+     *   found and valid      -> remember it and recalculate the price
+     */
+    private void applyPromo() {
+        String code = promoField.getText().trim();
+
+        if (code.isEmpty()) {
+            appliedPromo = null;
+            promoMessage.setText(" ");
+            showPrice();
+            return;
+        }
+
+        try {
+            PromoCode promo = db.validatePromoCode(code);
+
+            if (promo == null || !promo.isValid()) {
+                appliedPromo = null;
+                promoMessage.setForeground(Color.RED);
+                promoMessage.setText("Invalid or expired promo code");
+            } else {
+                appliedPromo = promo;
+                promoMessage.setForeground(GREEN);
+                promoMessage.setText(promo.getCode() + " applied: "
+                        + percent(promo.getDiscount()) + "% off");
+            }
+            showPrice();                                  // refresh the price with / without the discount
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Could not check the promo code.\n" + ex.getMessage(),
+                    "Database error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    /** 10.0 -> "10", 12.5 -> "12.5" (so a whole percentage has no ".0"). */
+    private static String percent(double p) {
+        if (p == Math.rint(p)) {
+            return String.valueOf((int) p);
+        }
+        return String.valueOf(p);
     }
 
     /** Used by later phases (slots, price, booking) to know which turf is chosen. */
@@ -312,8 +408,6 @@ public class BookSlotPanel extends JPanel {
 
     /** Draws "Booked" in red and "Available" in green. */
     private static class StatusRenderer extends DefaultTableCellRenderer {
-        private static final Color GREEN = new Color(0, 128, 0);   // dark green, readable on white
-
         @Override
         public Component getTableCellRendererComponent(JTable table, Object value,
                 boolean isSelected, boolean hasFocus, int row, int column) {
