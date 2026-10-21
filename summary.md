@@ -186,9 +186,37 @@ including affected files and how the result was validated.
 - **Change:** `refreshSlots()` clears the table, then loops through every slot calling
   `checkSlot()` once per slot and writes "Available" or "Booked". It runs whenever the
   turf or the date changes. On a DB error it shows one dialog and stops.
-- **Change:** `StatusRenderer` (small custom cell renderer) draws "Booked" in red.
+- **Change:** `StatusRenderer` (small custom cell renderer) draws "Booked" in red and
+  "Available" in dark green (`new Color(0, 128, 0)`).
+- **Bug fixed:** the first version only set red for "Booked". `DefaultTableCellRenderer`
+  remembers the last colour set, so red stuck to every unselected cell drawn afterwards
+  (even "Available"). Now the colour is set explicitly in both cases (red or green).
 - **Change:** `getSelectedDate()` added for later phases. Listeners are registered after
   all components are built because changing a selection calls `refreshSlots()`.
 - **Change:** `CustomerDashboard` window height 520 -> 680 so the 17 rows fit.
 - **Validation:** all files in `src/` compile with 0 errors. NOT run against MySQL or a
   display in the build environment, so "Done when" is still to be checked by hand.
+
+## 2026-10-21 (Phase 7)
+
+### Price Calculation with Surge
+
+- **Change:** `DatabaseManager.getMultiplier(String ruleName)` reads `multiplier` from
+  `pricing_rules` for "WEEKEND" or "EVENING" (seed: 1.20 and 1.30). Returns 1.0 if the
+  rule does not exist.
+- **Change:** `BookSlotPanel` now has a "Price" box (SOUTH of the panel). Clicking a row in
+  the slot table calls `showPrice()`, which reads both multipliers from MySQL, calls the
+  existing `Booking.determineSurge(...)` (no new surge logic was written) and shows
+  `Base: ₹1000.00 | Surge: ×1.30 | Total: ₹1300.00`.
+- **Behaviour:** multipliers are read from the database on every click (not cached), so a
+  change made by the admin in Phase 11 shows up immediately. Clicking a "Booked" slot shows
+  "This slot is already booked". Changing the turf or date resets the box to its prompt.
+- **Change:** a selection listener on the table (`ListSelectionListener`) triggers
+  `showPrice()`; it ignores events where `getValueIsAdjusting()` is true so each click
+  costs one pair of queries, not two. It is registered with the other listeners, last.
+- **Change:** `CustomerDashboard` window height 680 -> 720 to make room for the price box.
+- **Validation:** all of `src/` compiles with 0 errors. The four weekday/weekend x
+  day/evening combinations were checked by a small test of `determineSurge` with the seed
+  multipliers (base 1000: 1000, 1300, 1200, 1300; base 800: 800, 1040, 960, 1040), and the
+  18:00 / 17:00 boundary behaves correctly. The window itself was NOT run (no display or
+  MySQL in the build environment).

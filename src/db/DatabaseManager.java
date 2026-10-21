@@ -182,4 +182,29 @@ public class DatabaseManager {
             }
         }
     }
+
+    // =====================================================================
+    // Phase 7: Pricing
+    // =====================================================================
+
+    /**
+     * Reads one surge multiplier from pricing_rules ("WEEKEND" or "EVENING").
+     * Returns 1.0 (no surge) if the rule does not exist.
+     */
+    public double getMultiplier(String ruleName) throws SQLException {
+        String sql = "SELECT multiplier FROM pricing_rules WHERE rule_name = ?";
+
+        try (Connection con = connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setString(1, ruleName);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getDouble("multiplier");
+                }
+                return 1.0;                      // rule not found -> no surge
+            }
+        }
+    }
 }
