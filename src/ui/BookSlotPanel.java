@@ -8,6 +8,7 @@ import java.awt.Font;
 import java.awt.GridLayout;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
@@ -42,7 +43,8 @@ import model.Turf;
  *           Available or Booked for that turf and date.
  * Phase 7 : click a slot to see the price (base x surge = total).
  * Phase 8 : type a promo code and press Apply to see the discounted price.
- * Phase 9 : the Confirm button comes after that.
+ * Phase 9 : the Confirm Booking button asks "are you sure?", saves the
+ *           booking in MySQL and refreshes the slot table.
  */
 public class BookSlotPanel extends JPanel {
 
@@ -78,6 +80,9 @@ public class BookSlotPanel extends JPanel {
     private JTextField promoField; // Phase 8: where the customer types the code
     private JLabel promoMessage;   // Phase 8: "applied" / "Invalid or expired" text
     private PromoCode appliedPromo; // null = no promo applied
+
+    private JButton confirmButton;  // Phase 9: only enabled while a free slot is selected
+    private Booking currentBooking; // Phase 9: the booking shown in the price box (null = none)
 
     public BookSlotPanel(Customer customer) {
         this.customer = customer;
@@ -195,11 +200,20 @@ public class BookSlotPanel extends JPanel {
         discountInfo = new JLabel(" ");
         discountInfo.setFont(discountInfo.getFont().deriveFont(Font.BOLD, 14f));
 
-        JPanel panel = new JPanel(new GridLayout(3, 1, 0, 4));
+        // ---- row 4: the Confirm Booking button (Phase 9) ----
+        confirmButton = new JButton("Confirm Booking");
+        confirmButton.setEnabled(false);               // switched on when a free slot is selected
+        confirmButton.addActionListener(e -> confirmBooking());
+
+        JPanel confirmRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        confirmRow.add(confirmButton);
+
+        JPanel panel = new JPanel(new GridLayout(4, 1, 0, 4));
         panel.setBorder(BorderFactory.createTitledBorder("Price"));
         panel.add(promoRow);
         panel.add(priceInfo);
         panel.add(discountInfo);
+        panel.add(confirmRow);
         return panel;
     }
 
@@ -292,6 +306,7 @@ public class BookSlotPanel extends JPanel {
         if ("Booked".equals(status)) {
             priceInfo.setText("This slot is already booked");
             discountInfo.setText(" ");
+            setCurrentBooking(null);                      // nothing to confirm
             return;
         }
 
@@ -307,6 +322,8 @@ public class BookSlotPanel extends JPanel {
             booking.setSurgeMultiplier(surge);
             double discountPercent = (appliedPromo == null) ? 0 : appliedPromo.getDiscount();
             booking.calculateFinalTotal(discountPercent);
+            booking.setPromoCode(appliedPromo == null ? null : appliedPromo.getCode());
+            setCurrentBooking(booking);                   // Phase 9: this is what Confirm will save
 
             double surged = base * surge;                 // price before any discount
 
@@ -337,6 +354,86 @@ public class BookSlotPanel extends JPanel {
     private void clearPrice() {
         priceInfo.setText(PRICE_PROMPT);
         discountInfo.setText(" ");
+        setCurrentBooking(null);
+    }
+
+    /** Remembers the booking being shown, and enables Confirm only when there is one. */
+    private void setCurrentBooking(Booking booking) {
+        currentBooking = booking;
+        confirmButton.setEnabled(booking != null);
+    }
+
+    /**
+     * Phase 9: runs when the customer clicks Confirm Booking.
+     *   1. make sure the promo box and the price on screen agree
+     *   2. refuse slots that have already started
+     *   3. ask "are you sure?"
+     *   4. save (the database re-checks the slot, so a double booking is refused)
+     *   5. tell the customer what happened and refresh the slot table
+     */
+    private void confirmBooking() {
+        // 1. re-apply whatever is typed in the promo box, so the price we confirm
+        //    is exactly what the customer sees (also re-reads the surge multipliers)
+        applyPromo();
+        if (!promoField.getText().trim().isEmpty() && appliedPromo == null) {
+            JOptionPane.showMessageDialog(this,
+                    "The promo code is invalid or expired.\n"
+                  + "Correct it or clear the box, then press Confirm Booking again.",
+                    "Promo code", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        Booking booking = currentBooking;
+        Turf turf = getSelectedTurf();
+        if (booking == null || turf == null) {
+            JOptionPane.showMessageDialog(this, "Please select an available slot first.",
+                    "No slot selected", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        // 2. a slot whose start time has passed can't be booked
+        int startHour = Integer.parseInt(booking.getTimeSlot().substring(0, 2));
+        if (booking.getBookingDate().atTime(startHour, 0).isBefore(LocalDateTime.now())) {
+            JOptionPane.showMessageDialog(this,
+                    "That slot has already started. Please choose a later slot.",
+                    "Slot not available", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        // 3. "Book Green Arena, Wed, 21 Oct 2026, 18:00-19:00 for Rs.1170.00?"
+        String question = "Book " + turf.getName() + "\n"
+                + DATE_FORMAT.format(booking.getBookingDate()) + ", " + booking.getTimeSlot() + "\n"
+                + "for " + RUPEE + String.format("%.2f", booking.getFinalTotal()) + " ?";
+        int answer = JOptionPane.showConfirmDialog(this, question, "Confirm booking",
+                JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+        if (answer != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        // 4 + 5. save, then report
+        try {
+            int bookingId = db.saveBooking(booking);
+
+            if (bookingId == -1) {
+                JOptionPane.showMessageDialog(this,
+                        "Sorry, that slot was just booked by someone else.\nPlease choose another slot.",
+                        "Slot taken", JOptionPane.WARNING_MESSAGE);
+            } else {
+                JOptionPane.showMessageDialog(this,
+                        "Booking confirmed!\nYour booking ID is " + bookingId + ".",
+                        "Success", JOptionPane.INFORMATION_MESSAGE);
+                // one promo code per booking: clear it so it isn't applied to the next one
+                appliedPromo = null;
+                promoField.setText("");
+                promoMessage.setText(" ");
+            }
+            refreshSlots();       // the slot now shows "Booked"
+
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Could not save the booking.\n" + ex.getMessage(),
+                    "Database error", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     /**

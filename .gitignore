@@ -21,3 +21,6 @@ explanation.md
 Thumbs.db
 .DS_Store
 flow.md
+extras/ModelTest.java
+extras/Testconnection.java
+src/db/Testconnection.java

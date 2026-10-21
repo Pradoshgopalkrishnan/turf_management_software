@@ -229,6 +229,61 @@ including affected files and how the result was validated.
   `SELECT ... FROM promo_codes WHERE code = ? AND is_active = TRUE` and returns a
   `PromoCode` object, or `null` if no active code with that name exists. The expiry date
   is checked separately with `promo.isValid()`. MySQL compares text case-insensitively,
+  so "welcome10" finds "WELCOME10".
+- **Change:** the "Price" box in `BookSlotPanel` is now three rows: promo row (text field,
+  Apply button, message label), the Base / Surge / Total line, and a Discount / Final
+  total line. Pressing Enter in the field also applies the code.
+- **Change:** `applyPromo()`: blank field = no promo (removes any applied code, no error);
+  `null` or expired = red "Invalid or expired promo code" (and any earlier promo is
+  removed); valid = green "<CODE> applied: N% off", remembered in `appliedPromo`, price
+  recalculated. A promo stays applied when the slot, turf or date changes.
+- **Change:** `showPrice()` now builds a `Booking`, calls `setSurgeMultiplier(surge)` and
+  `calculateFinalTotal(discountPercent)`, so the discount maths lives in `Booking`
+  (one place, reused by Phase 9). With a promo the first line says "Subtotal" and the
+  second line shows the discount and final total.
+- **Change:** `percent()` helper prints 10.0 as "10" and 12.5 as "12.5". The dark green
+  colour is now one shared constant `GREEN` used by the promo message and `StatusRenderer`.
+- **Validation:** all of `src/` compiles with 0 errors. Tested in code with today's date
+  (2026-10-21): WELCOME10 valid; OLD20 invalid (expired); OFF50 invalid (inactive, and
+  the SQL never returns it); WELCOME10 on base 1000 gives 1300 -> 1170, 1000 -> 900,
+  1200 -> 1080; base 800 x1.30 gives 1040 -> 936. The window and the real MySQL lookups
+  were NOT run in the build environment.
+- **Note:** `WELCOME10` expires on 2026-12-31. If the demo is later than that, run
+  `UPDATE promo_codes SET expiry_date = '2027-12-31' WHERE code = 'WELCOME10';`.
+- **Next (Phase 9):** re-check the promo when Confirm is pressed (it could expire between
+  Apply and Confirm) and save `promo_code`, `discount_amount` and `final_total`.
+
+## 2026-10-21 (Phase 9)
+
+### Confirm Booking & Transactional Save
+
+- **Change (DatabaseManager):** Added `saveBooking(Booking b)` with full transaction
+  support to prevent double-booking race conditions:
+  1. `SELECT ... FOR UPDATE` locks the turf row (waits if another booking for same turf
+     is in progress)
+  2. Re-runs `isSlotFree()` while holding the lock (same check as `checkSlot()`)
+  3. `INSERT INTO bookings` with all fields: `user_id`, `turf_id`, `booking_date`,
+     `time_slot`, `base_price`, `surge_multiplier`, `promo_code` (nullable),
+     `discount_amount`, `final_total`, `status='CONFIRMED'`
+  4. `COMMIT` (releases lock) or `ROLLBACK` on any error
+  Returns the generated `booking_id`, or `-1` if the slot was taken by someone else
+  in the meantime.
+- **Change (BookSlotPanel):** Added "Confirm Booking" button (enabled only when a free
+  slot is selected). `confirmBooking()` flow:
+  1. Re-applies promo from text field (so confirmed price matches what customer sees)
+  2. Rejects slots whose start time has already passed
+  3. Shows confirmation dialog with turf name, date, slot, and final total
+  4. Calls `db.saveBooking(booking)` — database re-checks slot availability
+  5. On success: shows booking ID, clears promo field, calls `refreshSlots()` so the
+     slot now shows "Booked"
+  6. On `-1` (race condition): shows "Sorry, that slot was just booked by someone else"
+- **Change (BookSlotPanel):** Added `currentBooking` field to remember the booking
+  being shown in the price box; `setCurrentBooking()` enables/disables Confirm button.
+- **Change (BookSlotPanel):** `applyPromo()` now called at start of `confirmBooking()`
+  to ensure the promo in the text field matches what's applied.
+- **Validation:** all of `src/` compiles with 0 errors. Transaction logic and race
+  condition handling reviewed. The window and real MySQL were NOT run in the build
+  environment.SQL compares text case-insensitively,
   so `welcome10` finds `WELCOME10`.
 - **Change:** the "Price" box in `BookSlotPanel` is now three rows: promo row (text field,
   Apply button, message label), the Base / Surge / Total line, and a Discount / Final
