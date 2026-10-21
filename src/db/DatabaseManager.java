@@ -13,6 +13,7 @@ import java.util.Properties;
 
 import model.Admin;
 import model.Customer;
+import model.PromoCode;
 import model.Turf;
 import model.User;
 
@@ -204,6 +205,37 @@ public class DatabaseManager {
                     return rs.getDouble("multiplier");
                 }
                 return 1.0;                      // rule not found -> no surge
+            }
+        }
+    }
+
+    // =====================================================================
+    // Phase 8: Promo codes
+    // =====================================================================
+
+    /**
+     * Looks up an ACTIVE promo code. Returns a PromoCode object if one is found,
+     * otherwise null. The caller must still check promo.isValid() for the expiry date.
+     * (MySQL compares text without caring about upper/lower case, so "welcome10" works.)
+     */
+    public PromoCode validatePromoCode(String code) throws SQLException {
+        String sql = "SELECT code, discount_percent, expiry_date, is_active "
+                   + "FROM promo_codes WHERE code = ? AND is_active = TRUE";
+
+        try (Connection con = connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setString(1, code);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new PromoCode(
+                            rs.getString("code"),
+                            rs.getDouble("discount_percent"),
+                            rs.getDate("expiry_date").toLocalDate(),
+                            rs.getBoolean("is_active"));
+                }
+                return null;                     // no active code with that name
             }
         }
     }
