@@ -16,8 +16,8 @@ Sports turf owners often take bookings by phone or message, which leads to doubl
 | Model classes (OOP backbone) | | Done |
 | Login and customer registration | Everyone | Done |
 | View turfs and slot availability | Customer | Done |
-| Weekend / evening surge pricing | Customer | Planned |
-| Promo code validation | Customer | Planned |
+| Weekend / evening surge pricing | Customer | Done |
+| Promo code validation | Customer | Done |
 | Book a slot (with double-booking prevention) | Customer | Planned |
 | View and cancel own bookings | Customer | Planned |
 | Manage turfs (add, edit, delete) | Admin | Planned |
