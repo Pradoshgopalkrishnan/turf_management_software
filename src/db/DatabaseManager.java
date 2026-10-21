@@ -7,11 +7,14 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
 import model.Admin;
+import model.Booking;
 import model.Customer;
 import model.PromoCode;
 import model.Turf;
@@ -166,13 +169,22 @@ public class DatabaseManager {
      * the given turf + date + time slot.  Cancelled bookings do not block a slot.
      */
     public boolean checkSlot(int turfId, java.sql.Date date, String timeSlot) throws SQLException {
+        try (Connection con = connect()) {
+            return isSlotFree(con, turfId, date, timeSlot);
+        }
+    }
+
+    /**
+     * The real slot check. It works on a connection that is passed in, so
+     * saveBooking() (Phase 9) can run the same check INSIDE its transaction.
+     */
+    private boolean isSlotFree(Connection con, int turfId, java.sql.Date date, String timeSlot)
+            throws SQLException {
         String sql = "SELECT COUNT(*) FROM bookings "
                    + "WHERE turf_id = ? AND booking_date = ? "
                    + "AND time_slot = ? AND status = 'CONFIRMED'";
 
-        try (Connection con = connect();
-             PreparedStatement ps = con.prepareStatement(sql)) {
-
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, turfId);
             ps.setDate(2, date);
             ps.setString(3, timeSlot);
@@ -236,6 +248,90 @@ public class DatabaseManager {
                             rs.getBoolean("is_active"));
                 }
                 return null;                     // no active code with that name
+            }
+        }
+    }
+
+    // =====================================================================
+    // Phase 9: Save a booking
+    // =====================================================================
+
+    /**
+     * Saves a booking. Returns the new booking ID, or -1 if the slot was
+     * taken by somebody else in the meantime (nothing is saved in that case).
+     *
+     * Why a transaction? Checking "is it free?" and then inserting are TWO
+     * steps. If two customers click Confirm at the same moment, both could pass
+     * the check before either one inserts, and the slot would be booked twice.
+     * So we do everything in one transaction and first LOCK the turf's row
+     * (SELECT ... FOR UPDATE). A second customer booking the same turf waits
+     * here until the first one has committed, and then their check sees the
+     * first booking and says "taken".
+     *
+     * Steps:  1. lock the turf row
+     *         2. re-run the slot check (the same check as checkSlot)
+     *         3. INSERT the booking
+     *         4. commit  (or rollback if anything goes wrong)
+     */
+    public int saveBooking(Booking b) throws SQLException {
+        String lockSql = "SELECT turf_id FROM turfs WHERE turf_id = ? FOR UPDATE";
+        String insertSql = "INSERT INTO bookings "
+                + "(user_id, turf_id, booking_date, time_slot, base_price, surge_multiplier, "
+                + "promo_code, discount_amount, final_total, status) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'CONFIRMED')";
+
+        java.sql.Date date = java.sql.Date.valueOf(b.getBookingDate());
+
+        try (Connection con = connect()) {
+            con.setAutoCommit(false);              // start the transaction
+            try {
+                // 1. lock this turf's row (waits if another booking for it is in progress)
+                try (PreparedStatement lock = con.prepareStatement(lockSql)) {
+                    lock.setInt(1, b.getTurfId());
+                    try (ResultSet rs = lock.executeQuery()) {
+                        if (!rs.next()) {
+                            throw new SQLException("This turf no longer exists.");
+                        }
+                    }
+                }
+
+                // 2. re-check the slot while holding the lock
+                if (!isSlotFree(con, b.getTurfId(), date, b.getTimeSlot())) {
+                    con.rollback();
+                    return -1;                     // somebody else got it first
+                }
+
+                // 3. insert the booking and read back the ID MySQL generated
+                try (PreparedStatement ps =
+                         con.prepareStatement(insertSql, Statement.RETURN_GENERATED_KEYS)) {
+                    ps.setInt(1, b.getUserId());
+                    ps.setInt(2, b.getTurfId());
+                    ps.setDate(3, date);
+                    ps.setString(4, b.getTimeSlot());
+                    ps.setDouble(5, b.getBasePrice());
+                    ps.setDouble(6, b.getSurgeMultiplier());
+                    if (b.getPromoCode() == null) {
+                        ps.setNull(7, Types.VARCHAR);   // no promo used -> NULL in the table
+                    } else {
+                        ps.setString(7, b.getPromoCode());
+                    }
+                    ps.setDouble(8, b.getDiscountAmount());
+                    ps.setDouble(9, b.getFinalTotal());
+                    ps.executeUpdate();
+
+                    try (ResultSet keys = ps.getGeneratedKeys()) {
+                        keys.next();
+                        b.setBookingId(keys.getInt(1));
+                    }
+                }
+
+                // 4. make it permanent (this also releases the lock)
+                con.commit();
+                return b.getBookingId();
+
+            } catch (SQLException e) {
+                con.rollback();                    // undo everything, then tell the caller
+                throw e;
             }
         }
     }
