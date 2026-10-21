@@ -172,3 +172,23 @@ including affected files and how the result was validated.
   (no display and no MySQL in the build environment).
 - **Note:** `model/ModelTest.java` calls `openDashboard()`, so running it now opens real
   windows and needs the database. Remove that call from the test if you want it DB-free.
+
+## 2026-10-21 (Phase 6)
+
+### Date, Slot List and Availability Check
+
+- **Change:** `DatabaseManager.checkSlot(turfId, java.sql.Date, timeSlot)` counts
+  CONFIRMED bookings for that turf + date + slot and returns `true` when the count is 0
+  (slot is free). Cancelled bookings do not block a slot.
+- **Change:** `BookSlotPanel` now has a date `JComboBox<LocalDate>` (today + next 13 days,
+  shown as "Tue, 20 Oct 2026") and a read-only `JTable` (`DefaultTableModel`, columns
+  Slot | Status) for the 17 hourly slots 06:00-07:00 ... 22:00-23:00.
+- **Change:** `refreshSlots()` clears the table, then loops through every slot calling
+  `checkSlot()` once per slot and writes "Available" or "Booked". It runs whenever the
+  turf or the date changes. On a DB error it shows one dialog and stops.
+- **Change:** `StatusRenderer` (small custom cell renderer) draws "Booked" in red.
+- **Change:** `getSelectedDate()` added for later phases. Listeners are registered after
+  all components are built because changing a selection calls `refreshSlots()`.
+- **Change:** `CustomerDashboard` window height 520 -> 680 so the 17 rows fit.
+- **Validation:** all files in `src/` compile with 0 errors. NOT run against MySQL or a
+  display in the build environment, so "Done when" is still to be checked by hand.

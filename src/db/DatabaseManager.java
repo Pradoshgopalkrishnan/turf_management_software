@@ -155,4 +155,31 @@ public class DatabaseManager {
         }
         return turfs;
     }
+
+    // =====================================================================
+    // Phase 6: Slot availability
+    // =====================================================================
+
+    /**
+     * Is this slot free?  Returns true when there is NO confirmed booking for
+     * the given turf + date + time slot.  Cancelled bookings do not block a slot.
+     */
+    public boolean checkSlot(int turfId, java.sql.Date date, String timeSlot) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM bookings "
+                   + "WHERE turf_id = ? AND booking_date = ? "
+                   + "AND time_slot = ? AND status = 'CONFIRMED'";
+
+        try (Connection con = connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, turfId);
+            ps.setDate(2, date);
+            ps.setString(3, timeSlot);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();                       // COUNT(*) always returns exactly one row
+                return rs.getInt(1) == 0;        // 0 bookings -> slot is free
+            }
+        }
+    }
 }
