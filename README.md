@@ -13,9 +13,9 @@ Sports turf owners often take bookings by phone or message, which leads to doubl
 |---|---|---|
 | Database design and seed data | | Done |
 | JDBC connection (credentials kept out of Git) | | Done |
-| Model classes (OOP backbone) | | Written, being tested |
-| Login and customer registration | Everyone | Planned |
-| View turfs and slot availability | Customer | Planned |
+| Model classes (OOP backbone) | | Done |
+| Login and customer registration | Everyone | Done |
+| View turfs and slot availability | Customer | Done |
 | Weekend / evening surge pricing | Customer | Planned |
 | Promo code validation | Customer | Planned |
 | Book a slot (with double-booking prevention) | Customer | Planned |
