@@ -26,6 +26,7 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 
 import db.DatabaseManager;
+import model.Booking;
 import model.Customer;
 import model.Turf;
 
@@ -35,16 +36,20 @@ import model.Turf;
  * Phase 5 : pick a turf from a combo box and see its details.
  * Phase 6 : pick a date (next 14 days) and see which hourly slots are
  *           Available or Booked for that turf and date.
- * Phase 7-9: price panel, promo code and Confirm button come after that.
+ * Phase 7 : click a slot to see the price (base x surge = total).
+ * Phase 8-9: promo code and Confirm button come after that.
  */
 public class BookSlotPanel extends JPanel {
 
     private static final String RUPEE = "\u20B9";   // written as an escape so the file stays plain ASCII
+    private static final String TIMES = "\u00D7";   // the multiplication sign
 
     // Slots run 06:00 to 23:00, one hour each (06-07 ... 22-23) = 17 slots a day
     private static final int FIRST_HOUR = 6;
     private static final int LAST_HOUR  = 23;
     private static final int DAYS_AHEAD = 14;
+
+    private static final String PRICE_PROMPT = "Select an available slot to see the price";
 
     private static final DateTimeFormatter DATE_FORMAT =
             DateTimeFormatter.ofPattern("EEE, dd MMM yyyy", Locale.ENGLISH);
@@ -60,6 +65,8 @@ public class BookSlotPanel extends JPanel {
     private JComboBox<LocalDate> dateCombo;
     private DefaultTableModel slotModel;
     private JTable slotTable;
+
+    private JLabel priceInfo;      // Phase 7: "Base | Surge | Total" line
 
     public BookSlotPanel(Customer customer) {
         this.customer = customer;
@@ -94,6 +101,9 @@ public class BookSlotPanel extends JPanel {
         // ---- Phase 6: date row + slot table ----
         add(buildSlotArea(), BorderLayout.CENTER);
 
+        // ---- Phase 7: price panel under the table ----
+        add(buildPricePanel(), BorderLayout.SOUTH);
+
         // ---- listeners are added LAST, after every component above exists,
         //      because changing a selection calls refreshSlots() ----
         turfCombo.addActionListener(e -> {
@@ -101,6 +111,11 @@ public class BookSlotPanel extends JPanel {
             refreshSlots();
         });
         dateCombo.addActionListener(e -> refreshSlots());
+        slotTable.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {      // ignore the in-between events while the mouse is still down
+                showPrice();
+            }
+        });
 
         loadTurfs();
     }
@@ -148,6 +163,17 @@ public class BookSlotPanel extends JPanel {
         return area;
     }
 
+    /** Builds the small "Price" box that sits under the slot table. */
+    private JPanel buildPricePanel() {
+        priceInfo = new JLabel(PRICE_PROMPT);
+        priceInfo.setFont(priceInfo.getFont().deriveFont(Font.BOLD, 14f));
+
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createTitledBorder("Price"));
+        panel.add(priceInfo, BorderLayout.CENTER);
+        return panel;
+    }
+
     /** Fills the combo box with every turf from the database. */
     private void loadTurfs() {
         try {
@@ -190,6 +216,7 @@ public class BookSlotPanel extends JPanel {
      */
     private void refreshSlots() {
         slotModel.setRowCount(0);                       // clear old rows
+        clearPrice();                                   // the old selection no longer exists
 
         Turf turf = getSelectedTurf();
         LocalDate date = getSelectedDate();
@@ -212,6 +239,54 @@ public class BookSlotPanel extends JPanel {
                 return;
             }
         }
+    }
+
+    /**
+     * Phase 7: works out and shows the price of the slot that is clicked in the table.
+     *   surge = Booking.determineSurge(...)   (weekend / evening, the higher one wins)
+     *   total = base price x surge
+     * The multipliers are read from MySQL on every click, so if the admin changes
+     * them later the customer sees the new price straight away.
+     */
+    private void showPrice() {
+        int row = slotTable.getSelectedRow();            // -1 means nothing is selected
+        Turf turf = getSelectedTurf();
+        LocalDate date = getSelectedDate();
+        if (row == -1 || turf == null || date == null) {
+            clearPrice();
+            return;
+        }
+
+        String slot   = (String) slotModel.getValueAt(row, 0);
+        String status = (String) slotModel.getValueAt(row, 1);
+
+        if ("Booked".equals(status)) {
+            priceInfo.setText("This slot is already booked");
+            return;
+        }
+
+        try {
+            double weekendMultiplier = db.getMultiplier("WEEKEND");
+            double eveningMultiplier = db.getMultiplier("EVENING");
+
+            double surge = Booking.determineSurge(date, slot, weekendMultiplier, eveningMultiplier);
+            double base  = turf.getBasePrice();
+            double total = base * surge;
+
+            priceInfo.setText("Base: " + RUPEE + String.format("%.2f", base)
+                    + "   |   Surge: " + TIMES + String.format("%.2f", surge)
+                    + "   |   Total: " + RUPEE + String.format("%.2f", total));
+        } catch (SQLException ex) {
+            clearPrice();
+            JOptionPane.showMessageDialog(this,
+                    "Could not load the pricing rules.\n" + ex.getMessage(),
+                    "Database error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    /** Puts the price box back to its "nothing selected" message. */
+    private void clearPrice() {
+        priceInfo.setText(PRICE_PROMPT);
     }
 
     /** Used by later phases (slots, price, booking) to know which turf is chosen. */

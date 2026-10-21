@@ -29,7 +29,7 @@ public class CustomerDashboard extends JFrame {
 
         setTitle("Turf Booking System - Customer Dashboard");
         setDefaultCloseOperation(EXIT_ON_CLOSE);   // closing this window ends the program
-        setSize(720, 680);
+        setSize(720, 720);
         setLocationRelativeTo(null);
 
         // ---- top bar: welcome text on the left, Logout on the right ----
