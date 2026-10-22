@@ -49,8 +49,20 @@ public class CustomerDashboard extends JFrame {
 
         // ---- the tabs ----
         JTabbedPane tabs = new JTabbedPane();
-        tabs.addTab("Book a Slot", new BookSlotPanel(customer));
-        tabs.addTab("My Bookings", new MyBookingsPanel(customer));
+        BookSlotPanel bookPanel = new BookSlotPanel(customer);
+        MyBookingsPanel bookingsPanel = new MyBookingsPanel(customer);
+        tabs.addTab("Book a Slot", bookPanel);
+        tabs.addTab("My Bookings", bookingsPanel);
+
+        // Reload whichever tab the customer switches to, so the two tabs never show
+        // stale data (a new booking appears in My Bookings, a cancelled slot is free again).
+        tabs.addChangeListener(e -> {
+            if (tabs.getSelectedComponent() == bookingsPanel) {
+                bookingsPanel.loadBookings();
+            } else {
+                bookPanel.refreshSlots();
+            }
+        });
 
         setLayout(new BorderLayout());
         add(topBar, BorderLayout.NORTH);

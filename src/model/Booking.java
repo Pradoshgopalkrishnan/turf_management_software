@@ -2,6 +2,7 @@ package model;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /**
  * One booking: who booked which turf, on what date and slot, and the price.
@@ -21,6 +22,7 @@ public class Booking {
     private double discountAmount = 0;
     private double finalTotal;
     private String status = "CONFIRMED";
+    private String turfName;          // only filled when bookings are loaded for display (not a column of bookings)
 
     public Booking(int userId, int turfId, LocalDate bookingDate, String timeSlot, double basePrice) {
         this.userId = userId;
@@ -28,6 +30,27 @@ public class Booking {
         this.bookingDate = bookingDate;
         this.timeSlot = timeSlot;
         this.basePrice = basePrice;
+    }
+
+    /**
+     * Full constructor: rebuilds a booking that is ALREADY stored in the database
+     * (used by DatabaseManager.getBookingsByUser). Every value comes straight from the row,
+     * so nothing is recalculated.
+     */
+    public Booking(int bookingId, int userId, int turfId, LocalDate bookingDate, String timeSlot,
+                   double basePrice, double surgeMultiplier, String promoCode,
+                   double discountAmount, double finalTotal, String status) {
+        this.bookingId = bookingId;
+        this.userId = userId;
+        this.turfId = turfId;
+        this.bookingDate = bookingDate;
+        this.timeSlot = timeSlot;
+        this.basePrice = basePrice;
+        this.surgeMultiplier = surgeMultiplier;
+        this.promoCode = promoCode;
+        this.discountAmount = discountAmount;
+        this.finalTotal = finalTotal;
+        this.status = status;
     }
 
     /**
@@ -58,6 +81,19 @@ public class Booking {
         this.finalTotal = surgedPrice - discountAmount;
     }
 
+    /**
+     * The cancel rule: only a CONFIRMED booking whose slot has NOT started yet can be cancelled.
+     * (A booking for a later hour today, or any future date, can be cancelled; a slot that has
+     * already started, a past date, or an already-cancelled booking cannot.)
+     */
+    public boolean isCancellable() {
+        if (!"CONFIRMED".equals(status)) {
+            return false;
+        }
+        int startHour = Integer.parseInt(timeSlot.substring(0, 2));   // "18:00-19:00" -> 18
+        return !bookingDate.atTime(startHour, 0).isBefore(LocalDateTime.now());
+    }
+
     public double getFinalTotal() { return finalTotal; }
 
     // ---- getters ----
@@ -71,10 +107,12 @@ public class Booking {
     public String getPromoCode()        { return promoCode; }
     public double getDiscountAmount()   { return discountAmount; }
     public String getStatus()           { return status; }
+    public String getTurfName()         { return turfName; }
 
     // ---- setters (only for values that legitimately change after creation) ----
     public void setBookingId(int bookingId)               { this.bookingId = bookingId; }
     public void setSurgeMultiplier(double surgeMultiplier){ this.surgeMultiplier = surgeMultiplier; }
     public void setPromoCode(String promoCode)            { this.promoCode = promoCode; }
     public void setStatus(String status)                  { this.status = status; }
+    public void setTurfName(String turfName)              { this.turfName = turfName; }
 }

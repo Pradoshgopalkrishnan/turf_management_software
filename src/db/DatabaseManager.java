@@ -335,4 +335,71 @@ public class DatabaseManager {
             }
         }
     }
+
+    // =====================================================================
+    // Phase 10: My Bookings and Cancel
+    // =====================================================================
+
+    /**
+     * Returns every booking made by this user (confirmed AND cancelled), newest first,
+     * each with its turf name filled in.
+     */
+    public List<Booking> getBookingsByUser(int userId) throws SQLException {
+        String sql = "SELECT b.booking_id, b.user_id, b.turf_id, t.name AS turf_name, "
+                   + "b.booking_date, b.time_slot, b.base_price, b.surge_multiplier, "
+                   + "b.promo_code, b.discount_amount, b.final_total, b.status "
+                   + "FROM bookings b JOIN turfs t ON b.turf_id = t.turf_id "
+                   + "WHERE b.user_id = ? "
+                   + "ORDER BY b.booking_id DESC";   // highest ID = booked most recently
+
+        List<Booking> bookings = new ArrayList<>();
+
+        try (Connection con = connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, userId);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Booking b = new Booking(
+                            rs.getInt("booking_id"),
+                            rs.getInt("user_id"),
+                            rs.getInt("turf_id"),
+                            rs.getDate("booking_date").toLocalDate(),
+                            rs.getString("time_slot"),
+                            rs.getDouble("base_price"),
+                            rs.getDouble("surge_multiplier"),
+                            rs.getString("promo_code"),      // null when no promo was used
+                            rs.getDouble("discount_amount"),
+                            rs.getDouble("final_total"),
+                            rs.getString("status"));
+                    b.setTurfName(rs.getString("turf_name"));
+                    bookings.add(b);
+                }
+            }
+        }
+        return bookings;
+    }
+
+    /**
+     * Cancels a booking. Returns true if it was cancelled, false if nothing changed.
+     * The WHERE clause has three safety checks:
+     *   booking_id           -> the right booking
+     *   user_id              -> a customer can only cancel THEIR OWN booking
+     *   status = 'CONFIRMED' -> an already-cancelled booking is not cancelled twice
+     * The booking row is kept (status becomes CANCELLED), so the history stays, and
+     * checkSlot() ignores cancelled rows, so the slot becomes free again.
+     */
+    public boolean cancelBooking(int bookingId, int userId) throws SQLException {
+        String sql = "UPDATE bookings SET status = 'CANCELLED' "
+                   + "WHERE booking_id = ? AND user_id = ? AND status = 'CONFIRMED'";
+
+        try (Connection con = connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, bookingId);
+            ps.setInt(2, userId);
+            return ps.executeUpdate() == 1;      // 1 row changed = cancelled
+        }
+    }
 }
