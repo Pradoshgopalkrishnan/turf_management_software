@@ -402,4 +402,87 @@ public class DatabaseManager {
             return ps.executeUpdate() == 1;      // 1 row changed = cancelled
         }
     }
+
+    // =====================================================================
+    // Phase 11: Admin - manage turfs
+    // =====================================================================
+
+    /** Adds a new turf. An empty location is stored as NULL. */
+    public void addTurf(String name, String location, int capacity, double basePrice)
+            throws SQLException {
+        String sql = "INSERT INTO turfs (name, location, capacity, base_price) VALUES (?, ?, ?, ?)";
+
+        try (Connection con = connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setString(1, name);
+            setOptionalString(ps, 2, location);
+            ps.setInt(3, capacity);
+            ps.setDouble(4, basePrice);
+            ps.executeUpdate();
+        }
+    }
+
+    /** Updates a turf (found by its ID). Returns false if no turf with that ID exists. */
+    public boolean updateTurf(Turf t) throws SQLException {
+        String sql = "UPDATE turfs SET name = ?, location = ?, capacity = ?, base_price = ? "
+                   + "WHERE turf_id = ?";
+
+        try (Connection con = connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setString(1, t.getName());
+            setOptionalString(ps, 2, t.getLocation());
+            ps.setInt(3, t.getCapacity());
+            ps.setDouble(4, t.getBasePrice());
+            ps.setInt(5, t.getTurfId());
+            return ps.executeUpdate() == 1;
+        }
+    }
+
+    /**
+     * How many bookings (confirmed AND cancelled) exist for this turf?
+     * The admin may only delete a turf when this is 0.
+     */
+    public int countBookingsForTurf(int turfId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM bookings WHERE turf_id = ?";
+
+        try (Connection con = connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, turfId);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return rs.getInt(1);
+            }
+        }
+    }
+
+    /**
+     * Deletes a turf. Returns false if no turf with that ID exists.
+     * The caller checks countBookingsForTurf() first to show a friendly message;
+     * if a booking slipped in meanwhile, the foreign key makes MySQL refuse the delete
+     * (SQLException), so a turf with bookings can never be removed by mistake.
+     */
+    public boolean deleteTurf(int turfId) throws SQLException {
+        String sql = "DELETE FROM turfs WHERE turf_id = ?";
+
+        try (Connection con = connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, turfId);
+            return ps.executeUpdate() == 1;
+        }
+    }
+
+    /** Small helper: an empty or null text is stored as NULL instead of "". */
+    private static void setOptionalString(PreparedStatement ps, int index, String value)
+            throws SQLException {
+        if (value == null || value.isEmpty()) {
+            ps.setNull(index, Types.VARCHAR);
+        } else {
+            ps.setString(index, value);
+        }
+    }
 }
