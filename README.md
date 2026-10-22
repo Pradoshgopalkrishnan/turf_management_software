@@ -18,9 +18,9 @@ Sports turf owners often take bookings by phone or message, which leads to doubl
 | View turfs and slot availability | Customer | Done |
 | Weekend / evening surge pricing | Customer | Done |
 | Promo code validation | Customer | Done |
-| Book a slot (with double-booking prevention) | Customer | Planned |
-| View and cancel own bookings | Customer | Planned |
-| Manage turfs (add, edit, delete) | Admin | Planned |
+| Book a slot (with double-booking prevention) | Customer | Done |
+| View and cancel own bookings | Customer | Done |
+| Manage turfs (add, edit, delete) | Admin | Done |
 | Manage all bookings | Admin | Planned |
 | Manage promo codes and surge pricing | Admin | Planned |
 
