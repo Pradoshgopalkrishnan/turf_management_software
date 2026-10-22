@@ -256,8 +256,10 @@ public class BookSlotPanel extends JPanel {
      * Reloads the slot table for the selected turf + date:
      * loops through every slot, asks the database if it is free, and
      * writes "Available" or "Booked".
+     * Public because the dashboard calls it when the customer switches back to this tab
+     * (so a booking cancelled in "My Bookings" shows as Available again).
      */
-    private void refreshSlots() {
+    public void refreshSlots() {
         slotModel.setRowCount(0);                       // clear old rows
         clearPrice();                                   // the old selection no longer exists
 
