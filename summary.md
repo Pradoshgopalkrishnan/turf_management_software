@@ -341,3 +341,39 @@ including affected files and how the result was validated.
   SQL were NOT run in the build environment (no display or MySQL).
 - **Note:** switching back to the Book tab reloads the slot table, so any selected slot and
   price are cleared (the promo code stays applied).
+
+  ## 2026-10-22 (Phase 11)
+
+### Admin Dashboard and Manage Turfs
+
+- **Change:** New `ui/AdminDashboard` (`JFrame`): welcome label, Logout button and four tabs
+  Turfs | Bookings | Promo Codes | Pricing. Only Turfs is built; the other three are
+  "coming in Phase 12 / 13" placeholders. Logout calls `admin.logout()`, closes the window
+  and shows `LoginFrame` again.
+- **Change:** `Admin.openDashboard()` now opens `AdminDashboard` (it used to open
+  `PlaceholderDashboard`). `PlaceholderDashboard.java` is no longer used by anything and can
+  be deleted, as its own comment says.
+- **Change:** New `ui/ManageTurfsPanel` (the Turfs tab): a read-only table
+  `ID | Name | Location | Capacity | Base price`, text fields for name, location (optional),
+  capacity and base price, and buttons Add / Update / Delete / Clear. Clicking a row copies
+  that turf into the fields (`ListSelectionListener`) and enables Update and Delete. Success
+  and validation messages go to a status line (green / red); database errors and the delete
+  confirmation use dialogs.
+- **Validation:** `validate(...)` (static, no Swing, so it can be tested alone): name not
+  empty and at most 100 characters; location at most 150; capacity a whole number greater
+  than 0; base price a number greater than 0 (NaN and Infinity rejected). The price is
+  rounded to 2 decimals. An empty location is stored as NULL.
+- **Delete rule:** `countBookingsForTurf()` counts ALL bookings of the turf (cancelled ones
+  too, because the foreign key and the booking history need the turf row). If the count is
+  above 0 the admin sees a message and nothing is deleted. The foreign key is the last line
+  of defence if a booking sneaks in between the check and the delete.
+- **Change:** `DatabaseManager` gets `addTurf`, `updateTurf` (returns false if the turf is
+  gone), `countBookingsForTurf`, `deleteTurf` (returns false if the turf is gone) and a small
+  private helper `setOptionalString` (empty text becomes SQL NULL).
+- **Validation:** all of `src/` compiles with 0 errors; `validate()` was tested with 20 good
+  and bad inputs (empty or blank name, 100 and 101 character names, letters / decimals /
+  overflow / zero / negative capacity, letters / empty / zero / negative / NaN / Infinity
+  price) and all behave as intended. The window and the SQL were NOT run in the build
+  environment (no display or MySQL).
+- **Note:** a customer who is already logged in does not see a newly added turf until they
+  log out and in again (the turf list loads once when the Book tab is created).
