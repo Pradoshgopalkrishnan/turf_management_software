@@ -377,3 +377,33 @@ including affected files and how the result was validated.
   environment (no display or MySQL).
 - **Note:** a customer who is already logged in does not see a newly added turf until they
   log out and in again (the turf list loads once when the Book tab is created).
+
+  ## 2026-10-22 (Phase 12)
+
+### Admin: Manage All Bookings
+
+- **Change:** New `ui/ManageBookingsPanel` replaces the Bookings placeholder tab in
+  `AdminDashboard`. Table `ID | Customer | Turf | Date | Slot | Total | Status` (read-only)
+  showing EVERY customer's booking, confirmed and cancelled. Status text is green
+  (CONFIRMED) or grey (CANCELLED).
+- **Filters:** two combo boxes, Date and Turf. "All dates" / "All turfs" mean no filter; the date
+  combo lists only dates that have at least one booking (latest first). The bookings are loaded
+  from MySQL once and the filters work on that list in memory (`filterBookings()`), so changing
+  a filter is instant. A `loading` flag stops the combo rebuilding from triggering the filter.
+  A label shows "Showing X of Y booking(s)".
+- **Cancel:** Cancel Booking is enabled only when the selected row `isCancellable()` (CONFIRMED and
+  the slot has not started, the same rule as the customer). It re-checks the rule, asks for
+  confirmation, calls `cancelBookingAsAdmin()` and reloads the list. The customer's My Bookings
+  tab reloads whenever it is opened, so it then shows CANCELLED and the slot is Available again.
+- **Change:** `DatabaseManager.getAllBookings()` joins `bookings`, `users` and `turfs`; ordered by
+  date (latest first), then slot time, then ID, so one day reads top to bottom.
+  `cancelBookingAsAdmin(bookingId)` is the customer cancel without the `user_id` check
+  (still only `status = 'CONFIRMED'`). A private helper `readBooking(ResultSet)` now builds a
+  `Booking` for both `getBookingsByUser` (refactored to use it) and `getAllBookings`.
+- **Change:** `Booking` gets a display-only `customerName` (getter/setter), like `turfName`.
+- **Change:** `AdminDashboard` reloads the Bookings tab whenever the admin opens it (so it also
+  shows turfs added in the Turfs tab and bookings made or cancelled meanwhile).
+- **Validation:** all of `src/` compiles with 0 errors. `filterBookings()` and `distinctDates()`
+  were tested on a made-up list (no filter, date only, turf only, both, no match, unknown turf,
+  empty list, cancelled rows still shown, duplicate dates, ordering). The window and the SQL
+  were NOT run in the build environment (no display or MySQL).

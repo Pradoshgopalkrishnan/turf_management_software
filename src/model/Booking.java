@@ -23,6 +23,7 @@ public class Booking {
     private double finalTotal;
     private String status = "CONFIRMED";
     private String turfName;          // only filled when bookings are loaded for display (not a column of bookings)
+    private String customerName;      // same: filled only for the admin's "all bookings" list
 
     public Booking(int userId, int turfId, LocalDate bookingDate, String timeSlot, double basePrice) {
         this.userId = userId;
@@ -108,6 +109,7 @@ public class Booking {
     public double getDiscountAmount()   { return discountAmount; }
     public String getStatus()           { return status; }
     public String getTurfName()         { return turfName; }
+    public String getCustomerName()     { return customerName; }
 
     // ---- setters (only for values that legitimately change after creation) ----
     public void setBookingId(int bookingId)               { this.bookingId = bookingId; }
@@ -115,4 +117,5 @@ public class Booking {
     public void setPromoCode(String promoCode)            { this.promoCode = promoCode; }
     public void setStatus(String status)                  { this.status = status; }
     public void setTurfName(String turfName)              { this.turfName = turfName; }
+    public void setCustomerName(String customerName)      { this.customerName = customerName; }
 }
