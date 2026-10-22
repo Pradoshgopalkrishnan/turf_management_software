@@ -21,8 +21,8 @@ Sports turf owners often take bookings by phone or message, which leads to doubl
 | Book a slot (with double-booking prevention) | Customer | Done |
 | View and cancel own bookings | Customer | Done |
 | Manage turfs (add, edit, delete) | Admin | Done |
-| Manage all bookings | Admin | Planned |
-| Manage promo codes and surge pricing | Admin | Planned |
+| Manage all bookings | Admin | Done |
+| Manage promo codes and surge pricing | Admin | Done |
 
 See [`docs/TURF_BOOKING_PLAN.md`](docs/TURF_BOOKING_PLAN.md) for the full phase-by-phase build plan.
 
