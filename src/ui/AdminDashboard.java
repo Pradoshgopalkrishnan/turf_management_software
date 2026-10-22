@@ -10,7 +10,6 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
-import javax.swing.SwingConstants;
 
 import model.Admin;
 
@@ -21,8 +20,8 @@ import model.Admin;
  *   top    : welcome message + Logout button
  *   centre : tabs  ->  Turfs | Bookings | Promo Codes | Pricing
  *
- * Phase 11 builds the Turfs tab. The other three tabs are placeholders until
- * Phase 12 (Bookings) and Phase 13 (Promo Codes, Pricing).
+ * Phase 11 built the Turfs tab, Phase 12 the Bookings tab and Phase 13 the
+ * Promo Codes and Pricing tabs.
  */
 public class AdminDashboard extends JFrame {
 
@@ -53,21 +52,23 @@ public class AdminDashboard extends JFrame {
 
         // ---- the tabs ----
         JTabbedPane tabs = new JTabbedPane();
+        ManageBookingsPanel bookingsPanel = new ManageBookingsPanel();
         tabs.addTab("Turfs", new ManageTurfsPanel());
-        tabs.addTab("Bookings", comingSoon("Managing all bookings is built in Phase 12."));
-        tabs.addTab("Promo Codes", comingSoon("Managing promo codes is built in Phase 13."));
-        tabs.addTab("Pricing", comingSoon("Changing the surge multipliers is built in Phase 13."));
+        tabs.addTab("Bookings", bookingsPanel);
+        tabs.addTab("Promo Codes", new ManagePromoPanel());
+        tabs.addTab("Pricing", new ManagePricingPanel());
+
+        // Reload the bookings whenever the admin opens that tab, so it also shows
+        // turfs added meanwhile and bookings that customers made or cancelled.
+        tabs.addChangeListener(e -> {
+            if (tabs.getSelectedComponent() == bookingsPanel) {
+                bookingsPanel.loadBookings();
+            }
+        });
 
         setLayout(new BorderLayout());
         add(topBar, BorderLayout.NORTH);
         add(tabs, BorderLayout.CENTER);
-    }
-
-    /** A simple centred message, used for the tabs that are not built yet. */
-    private JPanel comingSoon(String message) {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.add(new JLabel(message, SwingConstants.CENTER), BorderLayout.CENTER);
-        return panel;
     }
 
     /** Close this window and go back to the login screen. */

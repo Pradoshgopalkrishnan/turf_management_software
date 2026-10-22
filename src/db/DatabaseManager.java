@@ -241,11 +241,7 @@ public class DatabaseManager {
 
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return new PromoCode(
-                            rs.getString("code"),
-                            rs.getDouble("discount_percent"),
-                            rs.getDate("expiry_date").toLocalDate(),
-                            rs.getBoolean("is_active"));
+                    return readPromoCode(rs);
                 }
                 return null;                     // no active code with that name
             }
@@ -361,20 +357,7 @@ public class DatabaseManager {
 
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    Booking b = new Booking(
-                            rs.getInt("booking_id"),
-                            rs.getInt("user_id"),
-                            rs.getInt("turf_id"),
-                            rs.getDate("booking_date").toLocalDate(),
-                            rs.getString("time_slot"),
-                            rs.getDouble("base_price"),
-                            rs.getDouble("surge_multiplier"),
-                            rs.getString("promo_code"),      // null when no promo was used
-                            rs.getDouble("discount_amount"),
-                            rs.getDouble("final_total"),
-                            rs.getString("status"));
-                    b.setTurfName(rs.getString("turf_name"));
-                    bookings.add(b);
+                    bookings.add(readBooking(rs));
                 }
             }
         }
@@ -484,5 +467,205 @@ public class DatabaseManager {
         } else {
             ps.setString(index, value);
         }
+    }
+
+    // =====================================================================
+    // Phase 12: Admin - manage all bookings
+    // =====================================================================
+
+    /**
+     * Returns EVERY booking of EVERY customer (confirmed and cancelled), each with its
+     * turf name and customer name filled in. Grouped by date (latest date first), and
+     * within one date the slots are in time order, so a day reads top to bottom.
+     */
+    public List<Booking> getAllBookings() throws SQLException {
+        String sql = "SELECT b.booking_id, b.user_id, u.name AS customer_name, "
+                   + "b.turf_id, t.name AS turf_name, "
+                   + "b.booking_date, b.time_slot, b.base_price, b.surge_multiplier, "
+                   + "b.promo_code, b.discount_amount, b.final_total, b.status "
+                   + "FROM bookings b "
+                   + "JOIN users u ON b.user_id = u.user_id "
+                   + "JOIN turfs t ON b.turf_id = t.turf_id "
+                   + "ORDER BY b.booking_date DESC, b.time_slot ASC, b.booking_id DESC";
+
+        List<Booking> bookings = new ArrayList<>();
+
+        try (Connection con = connect();
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+
+            while (rs.next()) {
+                Booking b = readBooking(rs);
+                b.setCustomerName(rs.getString("customer_name"));
+                bookings.add(b);
+            }
+        }
+        return bookings;
+    }
+
+    /**
+     * The admin's cancel. Same as cancelBooking() but with NO user_id check, because the
+     * admin may cancel any customer's booking. It still only touches CONFIRMED bookings,
+     * so a booking is never cancelled twice. Returns true if one booking was cancelled.
+     */
+    public boolean cancelBookingAsAdmin(int bookingId) throws SQLException {
+        String sql = "UPDATE bookings SET status = 'CANCELLED' "
+                   + "WHERE booking_id = ? AND status = 'CONFIRMED'";
+
+        try (Connection con = connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, bookingId);
+            return ps.executeUpdate() == 1;
+        }
+    }
+
+    /**
+     * Builds a Booking from the CURRENT row of a result set that has the booking columns
+     * plus turf_name. (Shared by getBookingsByUser and getAllBookings.)
+     */
+    private Booking readBooking(ResultSet rs) throws SQLException {
+        Booking b = new Booking(
+                rs.getInt("booking_id"),
+                rs.getInt("user_id"),
+                rs.getInt("turf_id"),
+                rs.getDate("booking_date").toLocalDate(),
+                rs.getString("time_slot"),
+                rs.getDouble("base_price"),
+                rs.getDouble("surge_multiplier"),
+                rs.getString("promo_code"),      // null when no promo was used
+                rs.getDouble("discount_amount"),
+                rs.getDouble("final_total"),
+                rs.getString("status"));
+        b.setTurfName(rs.getString("turf_name"));
+        return b;
+    }
+
+    // =====================================================================
+    // Phase 13: Admin - promo codes and pricing
+    // =====================================================================
+
+    /** Every promo code (active, inactive and expired), ordered by code. */
+    public List<PromoCode> getAllPromoCodes() throws SQLException {
+        String sql = "SELECT code, discount_percent, expiry_date, is_active "
+                   + "FROM promo_codes ORDER BY code";
+
+        List<PromoCode> promos = new ArrayList<>();
+
+        try (Connection con = connect();
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+
+            while (rs.next()) {
+                promos.add(readPromoCode(rs));
+            }
+        }
+        return promos;
+    }
+
+    /**
+     * Adds a new promo code. Returns true if it was added, or false if a code
+     * with that name already exists (the code is the primary key, so MySQL
+     * refuses the duplicate with error 1062).
+     */
+    public boolean addPromoCode(PromoCode p) throws SQLException {
+        String sql = "INSERT INTO promo_codes (code, discount_percent, expiry_date, is_active) "
+                   + "VALUES (?, ?, ?, ?)";
+
+        try (Connection con = connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setString(1, p.getCode());
+            ps.setDouble(2, p.getDiscount());
+            ps.setDate(3, java.sql.Date.valueOf(p.getExpiryDate()));
+            ps.setBoolean(4, p.isActive());
+            ps.executeUpdate();
+            return true;
+
+        } catch (SQLException e) {
+            if (e.getErrorCode() == 1062) {      // 1062 = duplicate entry for the primary key
+                return false;
+            }
+            throw e;                             // any other problem is a real error
+        }
+    }
+
+    /**
+     * Changes the discount, expiry date and active flag of an existing code
+     * (the code itself is the key, so it is never changed).
+     * Returns false if no code with that name exists any more.
+     */
+    public boolean updatePromoCode(PromoCode p) throws SQLException {
+        String sql = "UPDATE promo_codes SET discount_percent = ?, expiry_date = ?, is_active = ? "
+                   + "WHERE code = ?";
+
+        try (Connection con = connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setDouble(1, p.getDiscount());
+            ps.setDate(2, java.sql.Date.valueOf(p.getExpiryDate()));
+            ps.setBoolean(3, p.isActive());
+            ps.setString(4, p.getCode());
+            return ps.executeUpdate() == 1;
+        }
+    }
+
+    /**
+     * Deletes a promo code. Returns false if it does not exist any more.
+     * Safe even if bookings used the code, because bookings.promo_code is
+     * plain text and not a foreign key.
+     */
+    public boolean deletePromoCode(String code) throws SQLException {
+        String sql = "DELETE FROM promo_codes WHERE code = ?";
+
+        try (Connection con = connect();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setString(1, code);
+            return ps.executeUpdate() == 1;
+        }
+    }
+
+    /**
+     * Saves both surge multipliers, all or nothing: either both rows are updated
+     * or (if anything goes wrong) neither is. Existing bookings keep the multiplier
+     * they were made with, because bookings stores its own copy.
+     */
+    public void saveMultipliers(double weekend, double evening) throws SQLException {
+        // INSERT ... ON DUPLICATE KEY UPDATE = "update the row, or create it if it is missing"
+        String sql = "INSERT INTO pricing_rules (rule_name, multiplier) VALUES (?, ?) "
+                   + "ON DUPLICATE KEY UPDATE multiplier = VALUES(multiplier)";
+
+        try (Connection con = connect()) {
+            con.setAutoCommit(false);                 // start a transaction
+            try (PreparedStatement ps = con.prepareStatement(sql)) {
+
+                ps.setString(1, "WEEKEND");
+                ps.setDouble(2, weekend);
+                ps.executeUpdate();
+
+                ps.setString(1, "EVENING");
+                ps.setDouble(2, evening);
+                ps.executeUpdate();
+
+                con.commit();                         // both saved together
+            } catch (SQLException e) {
+                con.rollback();                       // undo the first one if the second failed
+                throw e;
+            }
+        }
+    }
+
+    /**
+     * Builds a PromoCode from the CURRENT row of a result set that has the columns
+     * code, discount_percent, expiry_date, is_active.
+     * (Shared by getAllPromoCodes and validatePromoCode.)
+     */
+    private PromoCode readPromoCode(ResultSet rs) throws SQLException {
+        return new PromoCode(
+                rs.getString("code"),
+                rs.getDouble("discount_percent"),
+                rs.getDate("expiry_date").toLocalDate(),
+                rs.getBoolean("is_active"));
     }
 }
