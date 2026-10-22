@@ -307,3 +307,37 @@ including affected files and how the result was validated.
   `UPDATE promo_codes SET expiry_date = '2027-12-31' WHERE code = 'WELCOME10';`.
 - **Next (Phase 9):** re-check the promo when Confirm is pressed (it could expire between
   Apply and Confirm) and save `promo_code`, `discount_amount` and `final_total`.
+
+  ## 2026-10-22 (Phase 10)
+
+### My Bookings and Cancel
+
+- **Change:** `DatabaseManager.getBookingsByUser(userId)` joins `bookings` with `turfs`
+  (so each booking carries its turf name) for one user, newest first
+  (`ORDER BY booking_id DESC`, the highest ID is the most recent booking). Confirmed and
+  cancelled bookings are both returned so the customer keeps their history.
+- **Change:** `DatabaseManager.cancelBooking(bookingId, userId)` runs
+  `UPDATE bookings SET status='CANCELLED' WHERE booking_id=? AND user_id=? AND status='CONFIRMED'`
+  and returns `true` when exactly 1 row changed. `user_id` means a customer can only cancel
+  their own booking; `status='CONFIRMED'` stops a double cancel. The row is kept, and
+  `checkSlot()` ignores cancelled rows, so the slot becomes free again.
+- **Change:** `Booking` gets a full constructor (to rebuild a stored booking from a row
+  without recalculating anything), a display-only `turfName` field with getter/setter, and
+  `isCancellable()`: true only when the status is CONFIRMED and the slot has not started yet
+  (this is the plan's optional "no cancelling after the slot start time" rule, and it matches
+  Phase 9, which refuses to book a slot that has already started).
+- **Change:** `MyBookingsPanel` replaces the placeholder: table `ID | Turf | Date | Slot |
+  Total | Status` (read-only), a count label, and a Cancel Booking button that is enabled
+  only when the selected row `isCancellable()`. Clicking it re-checks the rule, asks "are
+  you sure?", cancels, and reloads the table. Status text is green (CONFIRMED) or grey
+  (CANCELLED).
+- **Change:** `CustomerDashboard` adds a `ChangeListener` on the tabs: opening My Bookings
+  reloads the bookings; opening Book a Slot calls `refreshSlots()`. This is what makes a
+  cancelled booking's slot turn back to "Available" and a new booking appear in the list
+  without restarting. `BookSlotPanel.refreshSlots()` was made `public` for this.
+- **Validation:** all of `src/` compiles with 0 errors. `Booking.isCancellable()` was tested
+  for: future date, 13 days ahead, already cancelled, yesterday, last week, today's slot that
+  started an hour ago, today's current-hour slot and today's later slot. The window and the
+  SQL were NOT run in the build environment (no display or MySQL).
+- **Note:** switching back to the Book tab reloads the slot table, so any selected slot and
+  price are cleared (the promo code stays applied).
